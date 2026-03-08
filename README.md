@@ -281,3 +281,5 @@ Contributions are welcome! Please ensure:
 Built with:
 - [JavaPoet](https://github.com/square/javapoet) - Code generation
 - [Auto Service](https://github.com/google/auto) - Annotation processor registration
+
+Documentation and project setup assisted by [Claude Code](https://claude.com/claude-code) by Anthropic.
