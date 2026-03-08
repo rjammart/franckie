@@ -274,7 +274,7 @@ Contributions are welcome! Please ensure:
 
 ## Authors
 
-- Rafael Alonso
+- Raphael Jammart
 
 ## Acknowledgments
 
