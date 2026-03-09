@@ -780,6 +780,28 @@ public Rule<T> matches(java.util.regex.Pattern pattern) {
 }
 ```
 
+## Serializability Considerations
+
+⚠️ **Important Limitation: Custom Predicates Are Not Serializable**
+
+### What IS Serializable
+- **Validation Results**: All violations/results are serializable via `LoggedViolation`
+- **Built-in Rules**: `eq()`, `gt()`, `lt()`, `matches()`, `between()`, `hasSize()`, etc.
+- **Rule Composition**: `allOf()`, `and()`, `or()` (if inner rules are serializable)
+
+### What Is NOT Serializable
+- **Custom Predicates**: `satisfies(Predicate)` - contains lambda functions
+- **Contramap**: `contramap(Function)` - contains mapping functions
+
+### Why This Matters
+If you need to **persist rule definitions** (store in DB, send over network):
+- ✅ Use built-in validators: `EMAIL.matches("^[A-Za-z0-9+_.-]+@.*")`
+- ❌ Avoid custom predicates: `EMAIL.satisfies(e -> complexLogic(e))`
+
+For complex runtime validation, custom predicates are perfect - just don't persist those rule definitions.
+
+See [RULE_SERIALIZABILITY.md](RULE_SERIALIZABILITY.md) for complete details.
+
 ## Backward Compatibility
 
 ✅ **Fully backward compatible**

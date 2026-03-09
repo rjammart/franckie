@@ -109,7 +109,12 @@ public record Attr<T, A>(String name, Function<T, A> getter) {
     /**
      * Validates attribute value using custom predicate
      *
-     * @param predicate Validation predicate
+     * <p><b>⚠️ SERIALIZATION WARNING:</b> Rules created with this method are NOT serializable
+     * because they contain lambda/Predicate functions. Use for runtime validation only.
+     * For persistent rules, prefer built-in validators like {@link #matches(String)},
+     * {@link #between(Comparable, Comparable)}, {@link #hasSize(int)}, etc.
+     *
+     * @param predicate Validation predicate (not serializable)
      * @param description Human-readable description (used for default error message)
      * @return Rule for this attribute
      */
@@ -123,7 +128,9 @@ public record Attr<T, A>(String name, Function<T, A> getter) {
     /**
      * Validates attribute value using custom predicate with default description
      *
-     * @param predicate Validation predicate
+     * <p><b>⚠️ SERIALIZATION WARNING:</b> Not serializable. Use for runtime validation only.
+     *
+     * @param predicate Validation predicate (not serializable)
      * @return Rule for this attribute
      */
     public Rule<T> satisfies(java.util.function.Predicate<A> predicate) {

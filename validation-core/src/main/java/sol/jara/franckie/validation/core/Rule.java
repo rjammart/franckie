@@ -122,10 +122,14 @@ sealed interface EdgeRule<T> extends Rule<T> {
     /**
      * Custom predicate-based validation rule
      *
+     * <p><b>⚠️ SERIALIZATION WARNING:</b> This rule type is NOT serializable due to
+     * the lambda/Predicate function. Use for runtime validation only. For persistent
+     * rules, prefer built-in validators like {@code matches()}, {@code between()}, etc.
+     *
      * @param <T> Target object type
      * @param <A> Attribute type being validated
      * @param field The attribute accessor
-     * @param predicate The validation predicate
+     * @param predicate The validation predicate (not serializable)
      * @param description Human-readable description of the validation
      */
     record Predicate<T, A>(
@@ -243,7 +247,10 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
      * Creates a rule based on object-level predicate (not tied to a specific attribute).
      * This allows validation logic that requires access to multiple fields of the object.
      *
-     * @param predicate The validation predicate that tests the entire object
+     * <p><b>⚠️ SERIALIZATION WARNING:</b> Rules created with this method are NOT serializable
+     * because they contain lambda/Predicate functions. Use for runtime validation only.
+     *
+     * @param predicate The validation predicate that tests the entire object (not serializable)
      * @param description Human-readable description of the validation
      * @return Rule for object-level validation
      * @param <T> The type of object being validated
@@ -259,7 +266,9 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
     /**
      * Creates a rule based on object-level predicate with default description.
      *
-     * @param predicate The validation predicate that tests the entire object
+     * <p><b>⚠️ SERIALIZATION WARNING:</b> Not serializable. Use for runtime validation only.
+     *
+     * @param predicate The validation predicate that tests the entire object (not serializable)
      * @return Rule for object-level validation
      * @param <T> The type of object being validated
      */
