@@ -16,11 +16,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Extracts projection metadata from annotated record elements.
  */
 public final class ProjectionModelExtractor {
+    private static final Pattern CONSTANT_CASE = Pattern.compile("[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*");
 
     private final Elements elementUtils;
     private final Messager messager;
@@ -74,8 +76,8 @@ public final class ProjectionModelExtractor {
 
         for (RecordComponentElement component : components) {
             String componentName = component.getSimpleName().toString();
-            String constantName = toConstantName(componentName);
-            String logicalAttrName = extractLogicalAttrName(component);
+            String constantName = extractConstantName(component, componentName);
+            String logicalAttrName = extractLogicalAttrName(component, componentName, constantName);
             TypeMirror typeMirror = component.asType();
 
             if (!constantNames.add(constantName)) {
@@ -97,20 +99,94 @@ public final class ProjectionModelExtractor {
         return result;
     }
 
-    private String extractLogicalAttrName(RecordComponentElement component) {
+    private String extractConstantName(RecordComponentElement component, String componentName) {
         AttrName attrName = component.getAnnotation(AttrName.class);
+        String defaultConstantName = toConstantName(componentName);
 
         if (attrName == null) {
-            return component.getSimpleName().toString();
+            return defaultConstantName;
+        }
+
+        String explicitConstant = attrName.constant();
+        if (explicitConstant != null && !explicitConstant.isBlank()) {
+            validateConstantName(component, explicitConstant);
+            return explicitConstant;
         }
 
         String value = attrName.value();
-        if (value == null || value.isBlank()) {
+        if (value != null && !value.isBlank() && isConstantCase(value)) {
+            return value;
+        }
+
+        return defaultConstantName;
+    }
+
+    private String extractLogicalAttrName(
+            RecordComponentElement component,
+            String componentName,
+            String constantName
+    ) {
+        AttrName attrName = component.getAnnotation(AttrName.class);
+
+        if (attrName == null) {
+            return componentName;
+        }
+
+        String value = attrName.value();
+        String constant = attrName.constant();
+
+        if ((value == null || value.isBlank()) && (constant == null || constant.isBlank())) {
             error(component, "@%s value must not be blank", AttrName.class.getSimpleName());
             throw new InvalidProjectionException();
         }
 
+        if (value == null || value.isBlank()) {
+            return toLowerCamelCase(constantName);
+        }
+
+        if ((constant == null || constant.isBlank()) && isConstantCase(value)) {
+            return toLowerCamelCase(value);
+        }
+
         return value;
+    }
+
+    private void validateConstantName(RecordComponentElement component, String constantName) {
+        if (!isConstantCase(constantName)) {
+            error(component,
+                    "@%s constant must be CONSTANT_CASE (letters, digits, underscore): '%s'",
+                    AttrName.class.getSimpleName(),
+                    constantName);
+            throw new InvalidProjectionException();
+        }
+    }
+
+    private static boolean isConstantCase(String input) {
+        return input != null && CONSTANT_CASE.matcher(input).matches();
+    }
+
+    static String toLowerCamelCase(String constantCase) {
+        if (constantCase == null || constantCase.isBlank()) {
+            return constantCase;
+        }
+
+        String[] parts = constantCase.split("_+");
+        if (parts.length == 0) {
+            return constantCase;
+        }
+
+        StringBuilder result = new StringBuilder(parts[0].toLowerCase(Locale.ROOT));
+        for (int i = 1; i < parts.length; i++) {
+            String part = parts[i].toLowerCase(Locale.ROOT);
+            if (part.isEmpty()) {
+                continue;
+            }
+            result.append(Character.toUpperCase(part.charAt(0)));
+            if (part.length() > 1) {
+                result.append(part.substring(1));
+            }
+        }
+        return result.toString();
     }
 
     /**

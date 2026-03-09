@@ -6,25 +6,32 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Allows specifying a custom logical name for a record component in validation rules.
- * By default, the component name is used as the logical attribute name.
+ * Allows customizing generated Attr metadata for a record component.
  *
- * Example:
- * <pre>
- * {@code
- * @ValidationProjection
- * public record SessionProjection(
- *     @AttrName("session.name")
- *     String name,
- *     LocalDate startDate
- * ) {}
- * }
- * </pre>
+ * <p>By default:
+ * <ul>
+ *   <li>Logical name = component name (used in validation messages)</li>
+ *   <li>Generated constant = CONSTANT_CASE(component name)</li>
+ * </ul>
  *
- * In validation error messages, "name" will be referred to as "session.name".
+ * <p>Usage patterns:
+ * <ul>
+ *   <li>{@code @AttrName("session.status")} -> custom logical name only</li>
+ *   <li>{@code @AttrName("CREATE_SESSION_STATUS")} -> shorthand: custom constant and derived logical name
+ *       ({@code createSessionStatus})</li>
+ *   <li>{@code @AttrName(value = "session.status", constant = "CREATE_SESSION_STATUS")} -> explicit both</li>
+ * </ul>
  */
 @Target(ElementType.RECORD_COMPONENT)
 @Retention(RetentionPolicy.SOURCE)
 public @interface AttrName {
-    String value();
+    /**
+     * Logical attribute name used in validation messages.
+     */
+    String value() default "";
+
+    /**
+     * Optional generated constant name override.
+     */
+    String constant() default "";
 }

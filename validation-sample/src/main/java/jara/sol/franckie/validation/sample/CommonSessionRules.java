@@ -1,10 +1,10 @@
 package jara.sol.franckie.validation.sample;
 
-import jara.sol.franckie.validation.core.Attr;
 import jara.sol.franckie.validation.core.Rule;
+import jara.sol.franckie.validation.sample.generated.SessionProjectionAttrs;
 
-import java.time.LocalDate;
-import java.util.UUID;
+import static jara.sol.franckie.validation.sample.generated.SessionProjectionAttrs.*;
+
 
 /**
  * Common validation rules for SessionProjection.
@@ -14,20 +14,20 @@ public final class CommonSessionRules {
 
     // Note: After annotation processing, you can use generated SessionProjectionAttrs class
     // For now, we define Attr instances manually
-    private static final Attr<SessionProjection, String> NAME =
-            Attr.of("name", SessionProjection::name);
-
-    private static final Attr<SessionProjection, LocalDate> START_DATE =
-            Attr.of("startDate", SessionProjection::startDate);
-
-    private static final Attr<SessionProjection, LocalDate> END_DATE =
-            Attr.of("endDate", SessionProjection::endDate);
-
-    private static final Attr<SessionProjection, Integer> CAPACITY =
-            Attr.of("capacity", SessionProjection::capacity);
-
-    private static final Attr<SessionProjection, UUID> COURSE_ID =
-            Attr.of("courseId", SessionProjection::courseId);
+//    private static final Attr<SessionProjection, String> NAME =
+//            Attr.of("name", SessionProjection::name);
+//
+//    private static final Attr<SessionProjection, LocalDate> START_DATE =
+//            Attr.of("startDate", SessionProjection::startDate);
+//
+//    private static final Attr<SessionProjection, LocalDate> END_DATE =
+//            Attr.of("endDate", SessionProjection::endDate);
+//
+//    private static final Attr<SessionProjection, Integer> CAPACITY =
+//            Attr.of("capacity", SessionProjection::capacity);
+//
+//    private static final Attr<SessionProjection, UUID> COURSE_ID =
+//            Attr.of("courseId", SessionProjection::courseId);
 
     public static final Rule<SessionProjection> NAME_REQUIRED =
             NAME.notNull();

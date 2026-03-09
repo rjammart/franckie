@@ -211,4 +211,113 @@ class ValidationProjectionProcessorTest {
                 .contentsAsUtf8String()
                 .contains("Attr<SessionProjection, UUID> COURSE_ID");
     }
+
+    @Test
+    @DisplayName("given record with primitive fields when processed then generated Attrs use boxed types")
+    void given__record_with_primitive_fields__when__processed__then__generated_attrs_use_boxed_types() {
+        JavaFileObject sourceFile = JavaFileObjects.forSourceString(
+                "test.CreateSessionCommand",
+                """
+                package test;
+
+                import jara.sol.franckie.validation.core.annotation.ValidationProjection;
+                import java.util.UUID;
+
+                @ValidationProjection
+                public record CreateSessionCommand(
+                    UUID commandId,
+                    boolean sessionNameAlreadyExists,
+                    int retries
+                ) {}
+                """
+        );
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new ValidationProjectionProcessor())
+                .compile(sourceFile);
+
+        assertThat(compilation).succeeded();
+
+        assertThat(compilation)
+                .generatedSourceFile("test.generated.CreateSessionCommandAttrs")
+                .contentsAsUtf8String()
+                .contains("Attr<CreateSessionCommand, Boolean> SESSION_NAME_ALREADY_EXISTS");
+
+        assertThat(compilation)
+                .generatedSourceFile("test.generated.CreateSessionCommandAttrs")
+                .contentsAsUtf8String()
+                .contains("Attr<CreateSessionCommand, Integer> RETRIES");
+    }
+
+    @Test
+    @DisplayName("given @AttrName constant-case shorthand then generated constant is overridden and logical name is camelCase")
+    void given__attr_name_constant_case_shorthand__when__processed__then__overrides_constant_and_derives_logical_name() {
+        JavaFileObject sourceFile = JavaFileObjects.forSourceString(
+                "test.CreateSessionCommand",
+                """
+                package test;
+
+                import jara.sol.franckie.validation.core.annotation.AttrName;
+                import jara.sol.franckie.validation.core.annotation.ValidationProjection;
+
+                @ValidationProjection
+                public record CreateSessionCommand(
+                    @AttrName("CREATE_SESSION_STATUS")
+                    String status
+                ) {}
+                """
+        );
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new ValidationProjectionProcessor())
+                .compile(sourceFile);
+
+        assertThat(compilation).succeeded();
+
+        assertThat(compilation)
+                .generatedSourceFile("test.generated.CreateSessionCommandAttrs")
+                .contentsAsUtf8String()
+                .contains("Attr<CreateSessionCommand, String> CREATE_SESSION_STATUS");
+
+        assertThat(compilation)
+                .generatedSourceFile("test.generated.CreateSessionCommandAttrs")
+                .contentsAsUtf8String()
+                .contains("new Attr<>(\"createSessionStatus\", CreateSessionCommand::status)");
+    }
+
+    @Test
+    @DisplayName("given @AttrName with value and constant then both logical name and constant are overridden")
+    void given__attr_name_with_value_and_constant__when__processed__then__overrides_both() {
+        JavaFileObject sourceFile = JavaFileObjects.forSourceString(
+                "test.CreateSessionCommand",
+                """
+                package test;
+
+                import jara.sol.franckie.validation.core.annotation.AttrName;
+                import jara.sol.franckie.validation.core.annotation.ValidationProjection;
+
+                @ValidationProjection
+                public record CreateSessionCommand(
+                    @AttrName(value = "session.status", constant = "CREATE_SESSION_STATUS")
+                    String status
+                ) {}
+                """
+        );
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new ValidationProjectionProcessor())
+                .compile(sourceFile);
+
+        assertThat(compilation).succeeded();
+
+        assertThat(compilation)
+                .generatedSourceFile("test.generated.CreateSessionCommandAttrs")
+                .contentsAsUtf8String()
+                .contains("Attr<CreateSessionCommand, String> CREATE_SESSION_STATUS");
+
+        assertThat(compilation)
+                .generatedSourceFile("test.generated.CreateSessionCommandAttrs")
+                .contentsAsUtf8String()
+                .contains("new Attr<>(\"session.status\", CreateSessionCommand::status)");
+    }
 }
