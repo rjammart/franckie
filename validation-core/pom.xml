@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>jara.sol</groupId>
+        <groupId>jara.solutions</groupId>
         <artifactId>franckie</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
