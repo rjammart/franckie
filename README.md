@@ -881,7 +881,6 @@ Future enhancements being considered:
 - [ ] Async validation support
 - [ ] Integration with Spring Boot validation
 - [ ] JSON Schema generation from rules
-- [ ] GraphQL integration
 - [ ] Kotlin support
 
 ## License
