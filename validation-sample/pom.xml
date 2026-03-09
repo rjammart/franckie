@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>jara.solutions</groupId>
+        <groupId>solutions.jara</groupId>
         <artifactId>franckie</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
@@ -18,14 +18,14 @@
     <dependencies>
         <!-- Validation Core -->
         <dependency>
-            <groupId>jara.solutions</groupId>
+            <groupId>solutions.jara</groupId>
             <artifactId>validation-core</artifactId>
             <version>${project.version}</version>
         </dependency>
 
         <!-- Annotation Processor (compile-time only) -->
         <dependency>
-            <groupId>jara.solutions</groupId>
+            <groupId>solutions.jara</groupId>
             <artifactId>validation-processor</artifactId>
             <version>${project.version}</version>
             <scope>provided</scope>
@@ -47,7 +47,7 @@
                 <configuration>
                     <annotationProcessorPaths>
                         <path>
-                            <groupId>jara.solutions</groupId>
+                            <groupId>solutions.jara</groupId>
                             <artifactId>validation-processor</artifactId>
                             <version>${project.version}</version>
                         </path>
