@@ -47,7 +47,9 @@ public final class AttrsClassGenerator {
                 .addModifiers(Modifier.PUBLIC, Modifier.FINAL);
 
         for (ProjectionAttrModel attr : model.attrs()) {
-            TypeName componentType = TypeName.get(attr.typeMirror());
+            // Attr<T, A> requires reference types for generic arguments.
+            // Box primitives from record components (e.g. boolean -> Boolean).
+            TypeName componentType = TypeName.get(attr.typeMirror()).box();
 
             ParameterizedTypeName attrType = ParameterizedTypeName.get(
                     attrClass,

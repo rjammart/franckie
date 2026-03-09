@@ -1,7 +1,7 @@
 package jara.sol.franckie.validation.sample;
 
-import jara.sol.franckie.validation.core.Attr;
 import jara.sol.franckie.validation.core.Rule;
+import jara.sol.franckie.validation.sample.generated.CreateSessionCommandAttrs;
 
 /**
  * Validation rules for CreateSessionCommand.
@@ -10,18 +10,18 @@ import jara.sol.franckie.validation.core.Rule;
  */
 public final class CreateSessionRules {
 
-    private static final Attr<CreateSessionCommand, String> STATUS =
-            Attr.of("status", CreateSessionCommand::status);
-
-    private static final Attr<CreateSessionCommand, Boolean> SESSION_NAME_ALREADY_EXISTS =
-            Attr.of("sessionNameAlreadyExists", CreateSessionCommand::sessionNameAlreadyExists);
+//    private static final Attr<CreateSessionCommand, String> STATUS =
+//            Attr.of("status", CreateSessionCommand::status);
+//
+//    private static final Attr<CreateSessionCommand, Boolean> SESSION_NAME_ALREADY_EXISTS =
+//            Attr.of("sessionNameAlreadyExists", CreateSessionCommand::sessionNameAlreadyExists);
 
     // Context-specific rules
     public static final Rule<CreateSessionCommand> STATUS_MUST_BE_PENDING =
-            STATUS.eq("PENDING");
+            CreateSessionCommandAttrs.CREATE_SESSION_STATUS.eq("PENDING");
 
     public static final Rule<CreateSessionCommand> NAME_MUST_BE_UNIQUE =
-            SESSION_NAME_ALREADY_EXISTS.eq(false)
+            CreateSessionCommandAttrs.SESSION_NAME_ALREADY_EXISTS.eq(false)
                     .onInvalid("session.name.must.be.unique");
 
     /**
