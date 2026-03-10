@@ -119,6 +119,25 @@ sealed interface EdgeRule<T> extends Rule<T> {
 
     record IsContainIn<T,A>(Attr<T, A> field, Attr<T,List<A>> allowed) implements EdgeRule<T> {}
 
+    /**
+     * Custom predicate-based validation rule
+     *
+     * <p><b>⚠️ SERIALIZATION WARNING:</b> This rule type is NOT serializable due to
+     * the lambda/Predicate function. Use for runtime validation only. For persistent
+     * rules, prefer built-in validators like {@code matches()}, {@code between()}, etc.
+     *
+     * @param <T> Target object type
+     * @param <A> Attribute type being validated
+     * @param field The attribute accessor
+     * @param predicate The validation predicate (not serializable)
+     * @param description Human-readable description of the validation
+     */
+    record Predicate<T, A>(
+        Attr<T, A> field,
+        java.util.function.Predicate<A> predicate,
+        String description
+    ) implements EdgeRule<T> {}
+
 }
 
 public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.ContraMap, ComposedRule.Guard {
@@ -222,6 +241,39 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
 
     static <T,A> Rule<T> isContainIn(Attr<T, A> field, Attr<T,List<A>> allowed) {
         return new EdgeRule.IsContainIn<>(field, allowed);
+    }
+
+    /**
+     * Creates a rule based on object-level predicate (not tied to a specific attribute).
+     * This allows validation logic that requires access to multiple fields of the object.
+     *
+     * <p><b>⚠️ SERIALIZATION WARNING:</b> Rules created with this method are NOT serializable
+     * because they contain lambda/Predicate functions. Use for runtime validation only.
+     *
+     * @param predicate The validation predicate that tests the entire object (not serializable)
+     * @param description Human-readable description of the validation
+     * @return Rule for object-level validation
+     * @param <T> The type of object being validated
+     */
+    static <T> Rule<T> satisfies(
+        java.util.function.Predicate<T> predicate,
+        String description
+    ) {
+        Attr<T, T> identity = Attr.of("object", t -> t);
+        return new EdgeRule.Predicate<>(identity, predicate, description);
+    }
+
+    /**
+     * Creates a rule based on object-level predicate with default description.
+     *
+     * <p><b>⚠️ SERIALIZATION WARNING:</b> Not serializable. Use for runtime validation only.
+     *
+     * @param predicate The validation predicate that tests the entire object (not serializable)
+     * @return Rule for object-level validation
+     * @param <T> The type of object being validated
+     */
+    static <T> Rule<T> satisfies(java.util.function.Predicate<T> predicate) {
+        return satisfies(predicate, "custom object predicate");
     }
 
     /**
@@ -621,6 +673,38 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
 
             }
 
+            case EdgeRule.Predicate<T, ?> pred -> {
+                var attr = pred.field();
+                var predicate = pred.predicate();
+                Object found = attr.getter().apply(target);
+
+                @SuppressWarnings("unchecked")
+                java.util.function.Predicate<Object> p =
+                    (java.util.function.Predicate<Object>) predicate;
+
+                boolean res = p.test(found);
+
+                var result = new Result(
+                    res,
+                    "%s satisfies: %s".formatted(attr.name(), pred.description()),
+                    "%s=%s".formatted(attr.name(), found),
+                    Optional.ofNullable(pred.description()),
+                    found != null ? Optional.of(found.toString()) : Optional.empty()
+                );
+
+                if (!res) {
+                    violations.add(
+                        Violation.of(
+                            "validation.field.%s.predicate".formatted(attr.name()),
+                            Rule.defaultArguments().apply(result),
+                            result
+                        )
+                    );
+                }
+
+                yield result;
+            }
+
         };
     }
 
@@ -849,6 +933,7 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
             case EdgeRule.ContainsAll<T, ?> ca -> interpret(target, ca, violations);
             case EdgeRule.In<T, ?> in -> interpret(target, in, violations);
             case EdgeRule.IsContainIn<T,?> isContainIn -> interpret(target, isContainIn, violations);
+            case EdgeRule.Predicate<T, ?> pred -> interpret(target, pred, violations);
         };
     }
 
