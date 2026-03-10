@@ -123,6 +123,31 @@ sealed interface RuleDTO {
 
 ---
 
+## Recommended Pattern: Validation Context with Suppliers
+
+**The best approach** for complex validation that needs external data:
+
+### Use Validation Context Pattern
+```java
+@ValidationProjection
+record CreateSessionValidationContext(
+    CreateSessionCommand command,
+    BooleanSupplier sessionNameExists,        // Lazy DB query
+    Supplier<List<Instructor>> instructors,   // Lazy service call
+    Supplier<LocalDate> today                 // Current date
+) {}
+```
+
+**Benefits:**
+1. **🚀 Performance** - Lazy evaluation, suppliers only execute if needed
+2. **💾 Serializable** - Context structure is just field names + types
+3. **⚡ Fast-fail** - Use `onInvalidAndAbort` to skip expensive checks
+4. **🧪 Testable** - Easy to mock suppliers in tests
+
+See [VALIDATION_CONTEXT_PATTERN.md](VALIDATION_CONTEXT_PATTERN.md) for complete details.
+
+---
+
 ## Best Practices
 
 ### ✅ Do: Use Built-in Validators for Persistence
