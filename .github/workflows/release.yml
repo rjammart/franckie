@@ -7,7 +7,7 @@ on:
 
 jobs:
   release:
-    name: Create Release
+    name: Publish Release
     runs-on: ubuntu-latest
 
     permissions:
@@ -25,6 +25,11 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
+          server-id: central
+          server-username: CENTRAL_TOKEN_USERNAME
+          server-password: CENTRAL_TOKEN_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: GPG_PASSPHRASE
 
       - name: Extract version from tag
         id: version
@@ -35,11 +40,23 @@ jobs:
           mvn versions:set -DnewVersion=${{ steps.version.outputs.VERSION }}
           mvn versions:commit
 
-      - name: Build and package
-        run: mvn clean package -DskipTests
+      - name: Verify version
+        run: |
+          pom_version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          if [ "$pom_version" != "${{ steps.version.outputs.VERSION }}" ]; then
+            echo "Version mismatch: pom=$pom_version tag=${{ steps.version.outputs.VERSION }}"
+            exit 1
+          fi
 
       - name: Run tests
         run: mvn test
+
+      - name: Publish to Maven Central
+        run: mvn -B clean deploy
+        env:
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
