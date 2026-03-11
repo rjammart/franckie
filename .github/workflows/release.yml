@@ -1,0 +1,75 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on version tags like v1.0.0, v0.1.0, etc.
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Update Maven version
+        run: |
+          mvn versions:set -DnewVersion=${{ steps.version.outputs.VERSION }}
+          mvn versions:commit
+
+      - name: Build and package
+        run: mvn clean package -DskipTests
+
+      - name: Run tests
+        run: mvn test
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.version.outputs.VERSION }}
+          body: |
+            ## Franckie Validation Framework ${{ steps.version.outputs.VERSION }}
+
+            ### Installation
+
+            Maven:
+            ```xml
+            <dependency>
+                <groupId>solutions.jara</groupId>
+                <artifactId>validation-core</artifactId>
+                <version>${{ steps.version.outputs.VERSION }}</version>
+            </dependency>
+            ```
+
+            ### What's Changed
+            - See [CHANGELOG.md](CHANGELOG.md) for details
+
+            ### Documentation
+            - [Custom Predicates Guide](documentation/CUSTOM_PREDICATES_PROPOSAL.md)
+            - [Rule Serializability](documentation/RULE_SERIALIZABILITY.md)
+            - [Validation Context Pattern](documentation/VALIDATION_CONTEXT_PATTERN.md)
+          files: |
+            validation-core/target/validation-core-*.jar
+            validation-processor/target/validation-processor-*.jar
+          draft: true
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

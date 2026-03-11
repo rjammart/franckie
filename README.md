@@ -25,6 +25,11 @@ Franckie is a Java validation framework that provides:
 - [Example Usage](#example-usage)
 - [Rule Types](#rule-types)
 - [API Reference](#api-reference)
+- [License](#license)
+
+## License
+
+This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 ## Key Features
 
