@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [ main, master, develop ]
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   validate-pr:
     name: Validate Pull Request
@@ -40,8 +44,11 @@ jobs:
             fi
           fi
 
-      - name: Comment test results on PR
-        if: always()
+      - name: Publish test report
+        if: >-
+          always() &&
+          github.event.pull_request.head.repo.fork == false &&
+          github.actor != 'dependabot[bot]'
         uses: dorny/test-reporter@v1
         with:
           name: Test Results
