@@ -258,6 +258,35 @@ class CapacityReservationValidationTest {
         }
 
         /**
+         * Single-pass validation with GLOBAL item validation (Option 3).
+         * Integrates item validation into Rule composition using validateListAttr().
+         *
+         * This returns ONE violation if any items are invalid (not detailed per-item violations).
+         * Trades off violation detail for API simplicity and composition.
+         *
+         * Usage:
+         * <pre>
+         * List&lt;Violation&gt; violations = Rule.validate(
+         *     command,
+         *     AddCRRules.allWithGlobalItemValidation(existingDrop, activitySupplier)
+         * );
+         * </pre>
+         */
+        public static Rule<AddCapacityReservationsCommand> allWithGlobalItemValidation(
+            Drop existingDrop,
+            Supplier<List<UUID>> allowedActivityIdsSupplier
+        ) {
+            return basicValidation()
+                .and(CollectionValidator.validateListAttr(
+                    NEW_RESERVATIONS,
+                    CapacityReservationRules.all(),
+                    "command.newReservations.invalid"
+                ))
+                .and(noConflictWithExisting(existingDrop))
+                .and(activitiesAreAllowed(allowedActivityIdsSupplier));
+        }
+
+        /**
          * Basic command-level validation.
          */
         private static Rule<AddCapacityReservationsCommand> basicValidation() {
@@ -886,5 +915,113 @@ class CapacityReservationValidationTest {
         // Then
         assertTrue(violations.isEmpty());
         assertTrue(wasSupplierCalled[0], "Supplier should have been called during validation");
+    }
+
+    // ========== Single-Pass Validation Tests (Option 3: Global Item Validation) ==========
+
+    @Test
+    @DisplayName("given valid command using single-pass global validation when validate then no violations")
+    void given__valid_command_single_pass_global__when__validate__then__no_violations() {
+        // Given
+        Drop existingDrop = new Drop(UUID.randomUUID(), List.of());
+
+        UUID activityId = UUID.randomUUID();
+        AddCapacityReservationsCommand command = new AddCapacityReservationsCommand(
+            UUID.randomUUID(),
+            existingDrop.dropId(),
+            List.of(
+                new CapacityReservation("session", UUID.randomUUID(), "tandem", 10),
+                new CapacityReservation("activity", activityId, "sport", 5)
+            )
+        );
+
+        Supplier<List<UUID>> allowedActivities = () -> List.of(activityId);
+
+        // When - Single pass with global item validation
+        List<Violation> violations = Rule.validate(
+            command,
+            AddCRRules.allWithGlobalItemValidation(existingDrop, allowedActivities)
+        );
+
+        // Then
+        assertTrue(violations.isEmpty());
+    }
+
+    @Test
+    @DisplayName("given command with invalid CRs using single-pass global when validate then ONE global violation")
+    void given__invalid_crs_single_pass_global__when__validate__then__one_global_violation() {
+        // Given - Command with multiple invalid CRs
+        Drop existingDrop = new Drop(UUID.randomUUID(), List.of());
+
+        AddCapacityReservationsCommand command = new AddCapacityReservationsCommand(
+            UUID.randomUUID(),
+            existingDrop.dropId(),
+            List.of(
+                new CapacityReservation("invalid-type", UUID.randomUUID(), "tandem", 10),  // Invalid type
+                new CapacityReservation("session", null, "sport", 0)  // Missing target ID, zero capacity
+            )
+        );
+
+        Supplier<List<UUID>> allowedActivities = () -> List.of();
+
+        // When - Single pass with global item validation
+        List<Violation> violations = Rule.validate(
+            command,
+            AddCRRules.allWithGlobalItemValidation(existingDrop, allowedActivities)
+        );
+
+        // Then - We get ONE global violation (not detailed per-item)
+        assertFalse(violations.isEmpty());
+
+        // Should have exactly ONE violation for invalid items
+        long itemValidationViolations = violations.stream()
+            .filter(v -> v.translationKey().equals("command.newReservations.invalid"))
+            .count();
+
+        assertEquals(1, itemValidationViolations,
+            "Should have exactly ONE global violation for invalid items (not detailed per-item violations)");
+    }
+
+    @Test
+    @DisplayName("given command with invalid CRs and context issues using single-pass when validate then both violations")
+    void given__invalid_crs_and_context_issues_single_pass__when__validate__then__both_violations() {
+        // Given - Command with invalid CRs AND context issues
+        UUID sessionId = UUID.randomUUID();
+        Drop existingDrop = new Drop(
+            UUID.randomUUID(),
+            List.of(
+                new CapacityReservation("session", sessionId, "tandem", 10)
+            )
+        );
+
+        AddCapacityReservationsCommand command = new AddCapacityReservationsCommand(
+            UUID.randomUUID(),
+            existingDrop.dropId(),
+            List.of(
+                new CapacityReservation("invalid-type", UUID.randomUUID(), "tandem", 10),  // Invalid type
+                new CapacityReservation("session", sessionId, "tandem", 15)  // CONFLICT with existing
+            )
+        );
+
+        Supplier<List<UUID>> allowedActivities = () -> List.of();
+
+        // When - Single pass validation
+        List<Violation> violations = Rule.validate(
+            command,
+            AddCRRules.allWithGlobalItemValidation(existingDrop, allowedActivities)
+        );
+
+        // Then - We get violations for BOTH item validity AND context issues
+        assertFalse(violations.isEmpty());
+
+        // Global item validation violation
+        assertTrue(violations.stream()
+            .anyMatch(v -> v.translationKey().equals("command.newReservations.invalid")),
+            "Should have global item validation violation");
+
+        // Context violation (conflict)
+        assertTrue(violations.stream()
+            .anyMatch(v -> v.translationKey().equals("command.reservations.conflict")),
+            "Should have context validation violation");
     }
 }
