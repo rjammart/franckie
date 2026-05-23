@@ -96,6 +96,21 @@ public record Attr<T, A>(String name, Function<T, A> getter) {
         return new EdgeRule.ContainsAll<>(self, constantSubset);
     }
 
+    /**
+     * Validates that this attribute's value is contained in another attribute's list
+     *
+     * @param allowed Attribute containing the list of allowed values
+     * @return Rule for this attribute
+     * @param <E> Element type
+     */
+    public <E> Rule<T> isContainIn(Attr<T, List<E>> allowed) {
+        @SuppressWarnings("unchecked")
+        Attr<T, E> self = (Attr<T, E>) this;
+        return new EdgeRule.IsContainIn<>(self, allowed);
+    }
+
+    /**
+     * Validates attribute value using custom predicate
     public Rule<T> in(Attr<T, A> field, Collection<A> allowed) {
         return new EdgeRule.In<>(field, allowed);
     }
