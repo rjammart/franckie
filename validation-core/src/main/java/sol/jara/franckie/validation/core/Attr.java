@@ -110,7 +110,7 @@ public record Attr<T, A>(String name, Function<T, A> getter) {
     }
 
     /**
-     * Validates attribute value using custom predicate
+     * Validates attribute value using custom predicate*/
     public Rule<T> in(Attr<T, A> field, Collection<A> allowed) {
         return new EdgeRule.In<>(field, allowed);
     }
