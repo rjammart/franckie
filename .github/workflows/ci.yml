@@ -68,7 +68,7 @@ jobs:
               github.actor != 'dependabot[bot]'
             )
           )
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@v2
         with:
           name: Test Results (Java ${{ matrix.java }})
           path: '**/target/surefire-reports/TEST-*.xml'
