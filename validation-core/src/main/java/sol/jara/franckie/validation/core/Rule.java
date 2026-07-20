@@ -13,7 +13,7 @@ sealed interface ComposedRule<T> extends Rule<T> {
 
     record ContraMap<S,T>(Function<S,T> projector, Rule<T> rule) implements Rule<S> {}
 
-    record Guard<T>(Rule<T> precondition, Rule<T> rule) implements Rule<T> {}
+    record Guard<T>(Rule<T> precondition, Rule<T> rule, boolean propagate) implements Rule<T> {}
 
     record Or<T>(Rule<T> a, Rule<T> b) implements ComposedRule<T> {
         @Override
@@ -186,7 +186,7 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
     }
 
     static <T, A> Rule<T> notNull(Attr<T, A> field) {
-        return new ComposedRule.Not<>(new EdgeRule.IsNull<>(field));
+        return new EdgeRule.NotNull<>(field);
     }
 
     static <T, A> Rule<T> isEmpty(Attr<T, Optional<A>> field) {return new EdgeRule.IsEmpty<>(field);}
@@ -198,7 +198,11 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
     }
 
     static <T> Rule<T> guard(Rule<T> precondition, Rule<T> rule) {
-        return new ComposedRule.Guard<>(precondition, rule);
+        return new ComposedRule.Guard<>(precondition, rule, true);
+    }
+
+    static <T> Rule<T> guardSilently(Rule<T> precondition, Rule<T> rule) {
+        return new ComposedRule.Guard<>(precondition, rule, false);
     }
 
     static <T> Rule<T> and(Rule<T> a, Rule<T> b) {
@@ -283,8 +287,12 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
      * @param rule the guarded rule if the current Rule is matched
      * @return
      */
-    default Rule<T> guard( Rule<T> rule) {
-        return new ComposedRule.Guard<>(this, rule);
+    default Rule<T> guard(Rule<T> rule) {
+        return new ComposedRule.Guard<>(this, rule, true);
+    }
+
+    default Rule<T> guardSilently(Rule<T> rule) {
+        return new ComposedRule.Guard<>(this, rule, false);
     }
 
     default Rule<T> or(Rule<T> b) {
@@ -515,7 +523,7 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
                 boolean res = (found != null);
                 var result = new Result(
                         res,
-                        "%s is null".formatted(notNull.field().name()),
+                        "%s is not null".formatted(notNull.field().name()),
                         "%s=%s".formatted(notNull.field().name(), found),
                         notNull.field().name()
                 );
@@ -798,15 +806,13 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
                 int sizeBefore = violations.size();
                 Result pre = collect(target, g.precondition(), violations);
                 if (!pre.matched()) {
-                    // precondition failed => do NOT evaluate the guarded rule
-                    // Remove violations from precondition since the whole rule is skipped
                     int sizeAfter = violations.size();
-                    if (sizeAfter > sizeBefore) {
+                    if (!g.propagate() && sizeAfter > sizeBefore) {
                         violations.subList(sizeBefore, sizeAfter).clear();
                     }
                     yield new Result(
-                            Result.Status.SKIPPED,
-                            "guard(%s -> %s)".formatted(pre.expected(), "<skipped>"),
+                            g.propagate() ? Result.Status.FAILED : Result.Status.SKIPPED,
+                            "guard(%s -> %s)".formatted(pre.expected(), "<not evaluated>"),
                             pre.found(),
                             pre.left(),
                             pre.right()

@@ -214,10 +214,9 @@ class RuleValidationTest {
     }
 
     @Test
-    void given__guard_rule_with_precondition_failed__when__validate__then__guarded_rule_not_evaluated() {
+    void given__guard_rule_with_precondition_failed__when__validate__then__precondition_violation_propagated() {
         var person = new Person("John", 15, "john@example.com");
 
-        // Only validate email if age > 18
         Rule<Person> rule = Rule.guard(
                 AGE.gt(18),
                 EMAIL.notNull().onInvalid("email.required")
@@ -225,12 +224,38 @@ class RuleValidationTest {
 
         List<Violation> violations = Rule.validate(person, rule);
 
-        // No violations because precondition failed, so guarded rule wasn't evaluated
+        assertEquals(1, violations.size());
+        assertEquals("validation.field.age.gt", violations.get(0).translationKey());
+    }
+
+    @Test
+    void given__guardSilently_rule_with_precondition_failed__when__validate__then__no_violation() {
+        var person = new Person("John", 15, "john@example.com");
+
+        Rule<Person> rule = Rule.guardSilently(
+                AGE.gt(18),
+                EMAIL.notNull().onInvalid("email.required")
+        );
+
+        List<Violation> violations = Rule.validate(person, rule);
+
         assertTrue(violations.isEmpty());
     }
 
     @Test
-    void given__guard_rule_with_precondition_failed_wrapped_in_on_invalid__when__validate__then__no_violation() {
+    void given__guard_with_notNull_precondition__when__null__then__notNull_violation_propagated_and_inner_not_evaluated() {
+        var person = new Person(null, 25, "john@example.com");
+
+        Rule<Person> rule = NAME.notNull().guard(AGE.gt(18).onInvalid("age.check"));
+
+        List<Violation> violations = Rule.validate(person, rule);
+
+        assertEquals(1, violations.size());
+        assertEquals("validation.field.name.notNull", violations.get(0).translationKey());
+    }
+
+    @Test
+    void given__guard_rule_with_precondition_failed_wrapped_in_on_invalid__when__validate__then__custom_violation() {
         var person = new Person("John", 15, null);
 
         Rule<Person> rule = Rule.guard(
@@ -240,7 +265,8 @@ class RuleValidationTest {
 
         List<Violation> violations = Rule.validate(person, rule);
 
-        assertTrue(violations.isEmpty());
+        assertEquals(1, violations.size());
+        assertEquals("email.required.when.adult", violations.get(0).translationKey());
     }
 
     @Test
@@ -274,6 +300,52 @@ class RuleValidationTest {
         Rule<DateRange> rule = START.lt(END).onInvalid("start.must.be.before.end");
 
         List<Violation> violations = Rule.validate(range, rule);
+
+        assertTrue(violations.isEmpty());
+    }
+
+    @Test
+    void given__null_field__when__isNull__then__no_violation() {
+        var person = new Person(null, 25, "john@example.com");
+
+        Rule<Person> rule = NAME.isNull();
+
+        List<Violation> violations = Rule.validate(person, rule);
+
+        assertTrue(violations.isEmpty());
+    }
+
+    @Test
+    void given__non_null_field__when__isNull__then__violation() {
+        var person = new Person("John", 25, "john@example.com");
+
+        Rule<Person> rule = NAME.isNull();
+
+        List<Violation> violations = Rule.validate(person, rule);
+
+        assertEquals(1, violations.size());
+        assertEquals("validation.field.name.isNull", violations.get(0).translationKey());
+    }
+
+    @Test
+    void given__null_field__when__notNull_static__then__violation() {
+        var person = new Person(null, 25, "john@example.com");
+
+        Rule<Person> rule = Rule.notNull(NAME);
+
+        List<Violation> violations = Rule.validate(person, rule);
+
+        assertEquals(1, violations.size());
+        assertEquals("validation.field.name.notNull", violations.get(0).translationKey());
+    }
+
+    @Test
+    void given__non_null_field__when__notNull_static__then__no_violation() {
+        var person = new Person("John", 25, "john@example.com");
+
+        Rule<Person> rule = Rule.notNull(NAME);
+
+        List<Violation> violations = Rule.validate(person, rule);
 
         assertTrue(violations.isEmpty());
     }
