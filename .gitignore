@@ -151,3 +151,4 @@ rebel-remote.xml
 # Temporary files
 *.tmp
 *.temp
+.aider*

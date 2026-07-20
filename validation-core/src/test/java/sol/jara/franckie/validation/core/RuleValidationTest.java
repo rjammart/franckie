@@ -277,4 +277,89 @@ class RuleValidationTest {
 
         assertTrue(violations.isEmpty());
     }
+
+    record Container(List<String> items) {}
+
+    private static final Attr<Container, List<String>> ITEMS = Attr.of("items", Container::items);
+
+    @Test
+    void given__non_empty_collection__when__isNotEmptyCollection__then__no_violation() {
+        var container = new Container(List.of("a", "b"));
+
+        Rule<Container> rule = ITEMS.isNotEmptyCollection();
+
+        List<Violation> violations = Rule.validate(container, rule);
+
+        assertTrue(violations.isEmpty());
+    }
+
+    @Test
+    void given__empty_collection__when__isNotEmptyCollection__then__violation() {
+        var container = new Container(List.of());
+
+        Rule<Container> rule = ITEMS.isNotEmptyCollection();
+
+        List<Violation> violations = Rule.validate(container, rule);
+
+        assertEquals(1, violations.size());
+        assertEquals("validation.field.items.isNotEmptyCollection", violations.get(0).translationKey());
+    }
+
+    @Test
+    void given__null_collection__when__isNotEmptyCollection__then__violation() {
+        var container = new Container(null);
+
+        Rule<Container> rule = ITEMS.isNotEmptyCollection();
+
+        List<Violation> violations = Rule.validate(container, rule);
+
+        assertEquals(1, violations.size());
+        assertEquals("validation.field.items.isNotEmptyCollection", violations.get(0).translationKey());
+    }
+
+    @Test
+    void given__non_empty_collection__when__isNotEmptyCollection_with_onInvalid__then__no_violation() {
+        var container = new Container(List.of("a"));
+
+        Rule<Container> rule = ITEMS.isNotEmptyCollection().onInvalid("items.required");
+
+        List<Violation> violations = Rule.validate(container, rule);
+
+        assertTrue(violations.isEmpty());
+    }
+
+    @Test
+    void given__empty_collection__when__isNotEmptyCollection_with_onInvalid__then__custom_violation() {
+        var container = new Container(List.of());
+
+        Rule<Container> rule = ITEMS.isNotEmptyCollection().onInvalid("items.required");
+
+        List<Violation> violations = Rule.validate(container, rule);
+
+        assertEquals(1, violations.size());
+        assertEquals("items.required", violations.get(0).translationKey());
+    }
+
+    @Test
+    void given__empty_collection__when__isEmptyCollection__then__no_violation() {
+        var container = new Container(List.of());
+
+        Rule<Container> rule = ITEMS.isEmptyCollection();
+
+        List<Violation> violations = Rule.validate(container, rule);
+
+        assertTrue(violations.isEmpty());
+    }
+
+    @Test
+    void given__non_empty_collection__when__isEmptyCollection__then__violation() {
+        var container = new Container(List.of("a", "b"));
+
+        Rule<Container> rule = ITEMS.isEmptyCollection();
+
+        List<Violation> violations = Rule.validate(container, rule);
+
+        assertEquals(1, violations.size());
+        assertEquals("validation.field.items.isEmptyCollection", violations.get(0).translationKey());
+    }
 }

@@ -115,6 +115,8 @@ sealed interface EdgeRule<T> extends Rule<T> {
 
     record IsEmptyCollection<T,A>(Attr<T,Collection<A>> field) implements EdgeRule<T> {}
 
+    record IsNotEmptyCollection<T,A>(Attr<T,Collection<A>> field) implements EdgeRule<T> {}
+
     record In<T, A>(Attr<T, A> field, Collection<A> allowed) implements EdgeRule<T> { }
 
     record IsContainIn<T,A>(Attr<T, A> field, Attr<T,List<A>> allowed) implements EdgeRule<T> {}
@@ -574,6 +576,28 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
                 yield result;
             }
 
+            case EdgeRule.IsNotEmptyCollection<T, ?> isNotEmptyCollection -> {
+                Collection<?> found = isNotEmptyCollection.field().getter().apply(target);
+                boolean res = (found != null && !found.isEmpty());
+                var result = new Result(
+                        res,
+                        "%s is not empty".formatted(isNotEmptyCollection.field().name()),
+                        "%s=%s".formatted(isNotEmptyCollection.field().name(), found),
+                        isNotEmptyCollection.field().name()
+                );
+
+                if (!res) {
+                    violations.add(
+                            Violation.of(
+                                    "validation.field.%s.isNotEmptyCollection".formatted(isNotEmptyCollection.field().name()),
+                                    Rule.defaultArguments().apply(result),
+                                    result
+                            )
+                    );
+                }
+                yield result;
+            }
+
             case EdgeRule.ContainsAll<T, ?> cAll -> {
                 var superset = (List<?>) cAll.superset().getter().apply(target);
                 var subset = (List<?>) cAll.subset().getter().apply(target);
@@ -864,19 +888,37 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
             }
 
             case ComposedRule.Not<T> not -> {
+                int sizeBefore = violations.size();
                 Result inner = collect(target, not.rule(), violations);
                 Result.Status status = switch (inner.status()) {
                     case MATCHED -> Result.Status.FAILED;
                     case FAILED -> Result.Status.MATCHED;
                     case SKIPPED -> Result.Status.SKIPPED;
                 };
-                yield new Result(
+                var notResult = new Result(
                         status,
                         "not(%s)".formatted(inner.expected()),
                         inner.found(),
                         inner.left(),
                         inner.right()
                 );
+                int sizeAfter = violations.size();
+                if (status == Result.Status.MATCHED) {
+                    // Not succeeded: inner rule failed and added violations, clear them
+                    if (sizeAfter > sizeBefore) {
+                        violations.subList(sizeBefore, sizeAfter).clear();
+                    }
+                } else if (status == Result.Status.FAILED) {
+                    // Not failed: inner rule matched (no violations added), add one for the Not failure
+                    violations.add(
+                            Violation.of(
+                                    "validation.not",
+                                    Rule.defaultArguments().apply(notResult),
+                                    notResult
+                            )
+                    );
+                }
+                yield notResult;
             }
 
             case ComposedRule.Any<T> any -> {
@@ -930,6 +972,7 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
             case EdgeRule.NotNull<T, ?> notNull -> interpret(target, notNull, violations);
             case EdgeRule.IsEmpty<T, ?> isEmpty -> interpret(target, isEmpty, violations);
             case EdgeRule.IsEmptyCollection<T, ?> isEmptyCollection -> interpret(target, isEmptyCollection, violations);
+            case EdgeRule.IsNotEmptyCollection<T, ?> isNotEmptyCollection -> interpret(target, isNotEmptyCollection, violations);
             case EdgeRule.ContainsAll<T, ?> ca -> interpret(target, ca, violations);
             case EdgeRule.In<T, ?> in -> interpret(target, in, violations);
             case EdgeRule.IsContainIn<T,?> isContainIn -> interpret(target, isContainIn, violations);

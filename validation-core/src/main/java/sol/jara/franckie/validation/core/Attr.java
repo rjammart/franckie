@@ -64,7 +64,7 @@ public record Attr<T, A>(String name, Function<T, A> getter) {
     public <E> Rule<T> isNotEmptyCollection() {
         @SuppressWarnings("unchecked")
         Attr<T, Collection<E>> self = (Attr<T, Collection<E>>) this;
-        return Rule.not(new EdgeRule.IsEmptyCollection<>(self));
+        return new EdgeRule.IsNotEmptyCollection<>(self);
     }
 
     public Rule<T> isEmpty() {
