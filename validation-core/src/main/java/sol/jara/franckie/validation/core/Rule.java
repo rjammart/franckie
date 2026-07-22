@@ -13,7 +13,7 @@ sealed interface ComposedRule<T> extends Rule<T> {
 
     record ContraMap<S,T>(Function<S,T> projector, Rule<T> rule) implements Rule<S> {}
 
-    record Guard<T>(Rule<T> precondition, Rule<T> rule, boolean propagate) implements Rule<T> {}
+    record Guard<T>(Rule<T> precondition, Rule<T> rule) implements Rule<T> {}
 
     record Or<T>(Rule<T> a, Rule<T> b) implements ComposedRule<T> {
         @Override
@@ -26,6 +26,13 @@ sealed interface ComposedRule<T> extends Rule<T> {
         @Override
         public List<Rule<T>> getInnerRules() {
             return List.of(a, b);
+        }
+    }
+
+    record AndThen<T>(Rule<T> required, Rule<T> rule) implements ComposedRule<T> {
+        @Override
+        public List<Rule<T>> getInnerRules() {
+            return List.of(required, rule);
         }
     }
 
@@ -198,15 +205,15 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
     }
 
     static <T> Rule<T> guard(Rule<T> precondition, Rule<T> rule) {
-        return new ComposedRule.Guard<>(precondition, rule, true);
-    }
-
-    static <T> Rule<T> guardSilently(Rule<T> precondition, Rule<T> rule) {
-        return new ComposedRule.Guard<>(precondition, rule, false);
+        return new ComposedRule.Guard<>(precondition, rule);
     }
 
     static <T> Rule<T> and(Rule<T> a, Rule<T> b) {
         return new ComposedRule.And<>(a, b);
+    }
+
+    static <T> Rule<T> andThen(Rule<T> required, Rule<T> rule) {
+        return new ComposedRule.AndThen<>(required, rule);
     }
 
     static <T> Rule<T> not(Rule<T> rule) {
@@ -288,11 +295,7 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
      * @return
      */
     default Rule<T> guard(Rule<T> rule) {
-        return new ComposedRule.Guard<>(this, rule, true);
-    }
-
-    default Rule<T> guardSilently(Rule<T> rule) {
-        return new ComposedRule.Guard<>(this, rule, false);
+        return new ComposedRule.Guard<>(this, rule);
     }
 
     default Rule<T> or(Rule<T> b) {
@@ -301,6 +304,10 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
 
     default Rule<T> and(Rule<T> b) {
         return new ComposedRule.And<>(this, b);
+    }
+
+    default Rule<T> andThen(Rule<T> rule) {
+        return new ComposedRule.AndThen<>(this, rule);
     }
 
     default Rule<T> onInvalid(String messageCode, Function<Result, Map<String, String>> argumentsFunction) {
@@ -807,11 +814,11 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
                 Result pre = collect(target, g.precondition(), violations);
                 if (!pre.matched()) {
                     int sizeAfter = violations.size();
-                    if (!g.propagate() && sizeAfter > sizeBefore) {
+                    if (sizeAfter > sizeBefore) {
                         violations.subList(sizeBefore, sizeAfter).clear();
                     }
                     yield new Result(
-                            g.propagate() ? Result.Status.FAILED : Result.Status.SKIPPED,
+                            Result.Status.SKIPPED,
                             "guard(%s -> %s)".formatted(pre.expected(), "<not evaluated>"),
                             pre.found(),
                             pre.left(),
@@ -847,6 +854,28 @@ public sealed interface Rule<T> permits ComposedRule, EdgeRule, ComposedRule.Con
                         "(%s AND %s)".formatted(a.found(), b.found()),
                         a.left().isPresent() ? a.left() : b.left(),
                         a.right().isPresent() ? a.right() : b.right()
+                );
+            }
+
+            case ComposedRule.AndThen<T> andThen -> {
+                Result req = collect(target, andThen.required(), violations);
+                if (!req.matched()) {
+                    // required failed: keep its violations, skip right entirely
+                    yield new Result(
+                            Result.Status.FAILED,
+                            "(%s andThen <skipped>)".formatted(req.expected()),
+                            req.found(),
+                            req.left(),
+                            req.right()
+                    );
+                }
+                Result inner = collect(target, andThen.rule(), violations);
+                yield new Result(
+                        inner.status(),
+                        "(%s andThen %s)".formatted(req.expected(), inner.expected()),
+                        inner.found(),
+                        inner.left().isPresent() ? inner.left() : req.left(),
+                        inner.right().isPresent() ? inner.right() : req.right()
                 );
             }
 
