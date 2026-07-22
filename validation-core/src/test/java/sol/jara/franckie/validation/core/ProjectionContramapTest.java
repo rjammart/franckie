@@ -136,7 +136,7 @@ class ProjectionContramapTest {
             var endDateUnchanged = NEW_END_DATE.eq(EXISTING_END_DATE)
                     .onInvalid("session.end.date.cannot.change.when.published");
 
-            return Rule.guardSilently(
+            return Rule.guard(
                     statusIsPublished,
                     startDateUnchanged.and(endDateUnchanged)
             );

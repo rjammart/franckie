@@ -214,25 +214,11 @@ class RuleValidationTest {
     }
 
     @Test
-    void given__guard_rule_with_precondition_failed__when__validate__then__precondition_violation_propagated() {
+    void given__guard_rule_with_precondition_failed__when__validate__then__no_violation() {
         var person = new Person("John", 15, "john@example.com");
 
+        // guard is silent: if precondition fails, skip the inner rule with no violations
         Rule<Person> rule = Rule.guard(
-                AGE.gt(18),
-                EMAIL.notNull().onInvalid("email.required")
-        );
-
-        List<Violation> violations = Rule.validate(person, rule);
-
-        assertEquals(1, violations.size());
-        assertEquals("validation.field.age.gt", violations.get(0).translationKey());
-    }
-
-    @Test
-    void given__guardSilently_rule_with_precondition_failed__when__validate__then__no_violation() {
-        var person = new Person("John", 15, "john@example.com");
-
-        Rule<Person> rule = Rule.guardSilently(
                 AGE.gt(18),
                 EMAIL.notNull().onInvalid("email.required")
         );
@@ -243,19 +229,7 @@ class RuleValidationTest {
     }
 
     @Test
-    void given__guard_with_notNull_precondition__when__null__then__notNull_violation_propagated_and_inner_not_evaluated() {
-        var person = new Person(null, 25, "john@example.com");
-
-        Rule<Person> rule = NAME.notNull().guard(AGE.gt(18).onInvalid("age.check"));
-
-        List<Violation> violations = Rule.validate(person, rule);
-
-        assertEquals(1, violations.size());
-        assertEquals("validation.field.name.notNull", violations.get(0).translationKey());
-    }
-
-    @Test
-    void given__guard_rule_with_precondition_failed_wrapped_in_on_invalid__when__validate__then__custom_violation() {
+    void given__guard_rule_with_precondition_failed_wrapped_in_on_invalid__when__validate__then__no_violation() {
         var person = new Person("John", 15, null);
 
         Rule<Person> rule = Rule.guard(
@@ -265,8 +239,19 @@ class RuleValidationTest {
 
         List<Violation> violations = Rule.validate(person, rule);
 
-        assertEquals(1, violations.size());
-        assertEquals("email.required.when.adult", violations.get(0).translationKey());
+        assertTrue(violations.isEmpty());
+    }
+
+    @Test
+    void given__guard_with_notNull_precondition__when__null__then__silently_skipped() {
+        var person = new Person(null, 25, "john@example.com");
+
+        // null is the allowed case — guard skips silently, no violation
+        Rule<Person> rule = NAME.notNull().guard(AGE.gt(18).onInvalid("age.check"));
+
+        List<Violation> violations = Rule.validate(person, rule);
+
+        assertTrue(violations.isEmpty());
     }
 
     @Test
@@ -433,5 +418,68 @@ class RuleValidationTest {
 
         assertEquals(1, violations.size());
         assertEquals("validation.field.items.isEmptyCollection", violations.get(0).translationKey());
+    }
+
+    // ========== andThen tests ==========
+
+    @Test
+    void given__andThen_required_fails__when__validate__then__required_violation_and_right_skipped() {
+        var person = new Person(null, 25, "john@example.com");
+
+        // NAME is null: notNull fails, the gt comparison is skipped (would NPE on null)
+        Rule<Person> rule = NAME.notNull().onInvalid("name.required")
+                .andThen(NAME.eq("John").onInvalid("name.must.be.john"));
+
+        List<Violation> violations = Rule.validate(person, rule);
+
+        assertEquals(1, violations.size());
+        assertEquals("name.required", violations.get(0).translationKey());
+    }
+
+    @Test
+    void given__andThen_required_passes_inner_fails__when__validate__then__inner_violation() {
+        var person = new Person("Jane", 25, "john@example.com");
+
+        Rule<Person> rule = NAME.notNull().onInvalid("name.required")
+                .andThen(NAME.eq("John").onInvalid("name.must.be.john"));
+
+        List<Violation> violations = Rule.validate(person, rule);
+
+        assertEquals(1, violations.size());
+        assertEquals("name.must.be.john", violations.get(0).translationKey());
+    }
+
+    @Test
+    void given__andThen_both_pass__when__validate__then__no_violations() {
+        var person = new Person("John", 25, "john@example.com");
+
+        Rule<Person> rule = NAME.notNull().onInvalid("name.required")
+                .andThen(NAME.eq("John").onInvalid("name.must.be.john"));
+
+        List<Violation> violations = Rule.validate(person, rule);
+
+        assertTrue(violations.isEmpty());
+    }
+
+    @Test
+    void given__andThen_in_allOf__when__required_fails__then__only_required_violation_collected() {
+        var person = new Person(null, 15, null);
+
+        // Classic use case: field required + conditional constraint, no NPE risk
+        Rule<Person> rule = Rule.allOf(
+                NAME.notNull().onInvalid("name.required")
+                        .andThen(NAME.eq("John").onInvalid("name.must.be.john")),
+                AGE.gt(18).onInvalid("age.must.be.greater.than.18"),
+                EMAIL.notNull().onInvalid("email.required")
+        );
+
+        List<Violation> violations = Rule.validate(person, rule);
+
+        assertEquals(3, violations.size());
+        assertTrue(violations.stream().anyMatch(v -> v.translationKey().equals("name.required")));
+        assertTrue(violations.stream().anyMatch(v -> v.translationKey().equals("age.must.be.greater.than.18")));
+        assertTrue(violations.stream().anyMatch(v -> v.translationKey().equals("email.required")));
+        // name.must.be.john is NOT present because right was skipped
+        assertTrue(violations.stream().noneMatch(v -> v.translationKey().equals("name.must.be.john")));
     }
 }
